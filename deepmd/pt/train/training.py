@@ -126,6 +126,7 @@ class Trainer:
         self.model_keys = (
             list(model_params["model_dict"]) if self.multi_task else ["Default"]
         )
+        self.sorted_model_keys = sorted(self.model_keys)
         self.rank = (
             dist.get_rank() if dist.is_available() and dist.is_initialized() else 0
         )
@@ -1163,9 +1164,11 @@ class Trainer:
         ]
         input_dict = {item_key: None for item_key in input_keys}
         label_dict = {}
-        nframes = batch_data['coord'].shape[0]
-        data_id_onehot = self.dataid[self.model_keys.index(task_key)]
-        batch_data["fparam"] = torch.tile(to_torch_tensor(data_id_onehot).unsqueeze(0), (nframes, 1))
+        nframes = batch_data["coord"].shape[0]
+        data_id_onehot = self.dataid[self.sorted_model_keys.index(task_key)]
+        batch_data["fparam"] = torch.tile(
+            to_torch_tensor(data_id_onehot).unsqueeze(0), (nframes, 1)
+        )
 
         for item_key in batch_data:
             if item_key in input_keys:

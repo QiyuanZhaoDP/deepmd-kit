@@ -504,6 +504,13 @@ def make_model(T_AtomicModel: type[BaseAtomicModel]):
             """
             return self.atomic_model.get_sel_type()
 
+        def set_dataid(self, num_data, data_idx):
+            self.atomic_model.set_dataid(num_data, data_idx)
+
+        @torch.jit.export
+        def get_dataid(self) -> tuple[int, int]:
+            return self.atomic_model.get_dataid()
+
         @torch.jit.export
         def is_aparam_nall(self) -> bool:
             """Check whether the shape of atomic parameters is (nframes, nall, ndim).

@@ -61,6 +61,8 @@ class DPAtomicModel(BaseAtomicModel):
         self.rcut = self.descriptor.get_rcut()
         self.sel = self.descriptor.get_sel()
         self.fitting_net = fitting
+        self.dataid_num_data = 0
+        self.dataid_data_idx = 0
         super().init_out_stat()
 
     @torch.jit.export
@@ -80,6 +82,14 @@ class DPAtomicModel(BaseAtomicModel):
     def get_sel(self) -> list[int]:
         """Get the neighbor selection."""
         return self.sel
+
+    def set_dataid(self, num_data, data_idx):
+        self.dataid_num_data = num_data
+        self.dataid_data_idx = data_idx
+
+    @torch.jit.export
+    def get_dataid(self) -> tuple[int, int]:
+        return self.dataid_num_data, self.dataid_data_idx
 
     def mixed_types(self) -> bool:
         """If true, the model

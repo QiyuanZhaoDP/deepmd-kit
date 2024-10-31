@@ -111,6 +111,7 @@ class DeepEval(DeepEvalBackend):
             self.multi_task = "model_dict" in self.input_param
             if self.multi_task:
                 model_keys = list(self.input_param["model_dict"].keys())
+                sorted_keys = sorted(model_keys)
                 if isinstance(head, int):
                     head = model_keys[0]
                 assert (
@@ -119,6 +120,8 @@ class DeepEval(DeepEvalBackend):
                 assert (
                     head in model_keys
                 ), f"No head named {head} in model! Available heads are: {model_keys}"
+                self.head_num = len(sorted_keys)
+                self.head_idx = sorted_keys.index(head)
                 self.input_param = self.input_param["model_dict"][head]
                 state_dict_head = {"_extra_state": state_dict["_extra_state"]}
                 for item in state_dict:
@@ -127,11 +130,17 @@ class DeepEval(DeepEvalBackend):
                             item.replace(f"model.{head}.", "model.Default.")
                         ] = state_dict[item].clone()
                 state_dict = state_dict_head
+            else:
+                raise RuntimeError(
+                    "Model with data id must be tested from multitask ckpt!"
+                )
             model = get_model(self.input_param).to(DEVICE)
+            model.set_dataid(self.head_num, self.head_idx)  # set data id
             model = torch.jit.script(model)
             self.dp = ModelWrapper(model)
             self.dp.load_state_dict(state_dict)
         elif str(self.model_path).endswith(".pth"):
+            # raise RuntimeError("Model with data id must be tested from multitask ckpt!")
             model = torch.jit.load(model_file, map_location=env.DEVICE)
             self.dp = ModelWrapper(model)
             model_def_script = self.dp.model["Default"].get_model_def_script()
@@ -286,6 +295,10 @@ class DeepEval(DeepEvalBackend):
             coords, atom_types, len(atom_types.shape) > 1
         )
         request_defs = self._get_request_defs(atomic)
+        assert fparam is None, "Model with data id must not have fparam!"
+        dataid_num, dataid_idx = self.dp.model["Default"].get_dataid()
+        dataid = np.eye(dataid_num, dtype=float)[dataid_idx]
+        fparam = np.tile(dataid.reshape(1, -1), (coords.shape[0], 1))
         if "spin" not in kwargs or kwargs["spin"] is None:
             out = self._eval_func(self._eval_model, numb_test, natoms)(
                 coords, cells, atom_types, fparam, aparam, request_defs

@@ -40,6 +40,10 @@ class Tester:
         model_params = state_dict["_extra_state"]["model_params"]
         self.multi_task = "model_dict" in model_params
         if self.multi_task:
+            model_keys = list(model_params["model_dict"].keys())
+            sorted_keys = sorted(model_keys)
+            self.head_num = len(sorted_keys)
+            self.head_idx = sorted_keys.index(head)
             assert head is not None, "Head must be specified in multitask mode!"
             self.head = head
             assert head in model_params["model_dict"], (
@@ -54,9 +58,12 @@ class Tester:
                         item.replace(f"model.{head}.", "model.Default.")
                     ] = state_dict[item].clone()
             state_dict = state_dict_head
+        else:
+            raise RuntimeError("Model with data id must be frozen from multitask ckpt!")
 
         self.model_params = deepcopy(model_params)
         self.model = get_model(model_params).to(DEVICE)
+        self.model.set_dataid(self.head_num, self.head_idx)  # set data id
 
         # Model Wrapper
         self.wrapper = ModelWrapper(self.model)  # inference only
