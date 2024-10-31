@@ -967,7 +967,7 @@ class DeepPot {
    * @warning Natoms should not be zero when computing multiple frames.
    **/
   template <typename VALUETYPE, typename ENERGYVTYPE>
-  void compute(
+  void compute_spin(
       ENERGYVTYPE &ener,
       std::vector<VALUETYPE> &force,
       std::vector<VALUETYPE> &force_mag,
@@ -1101,7 +1101,7 @@ class DeepPot {
    * @warning Natoms should not be zero when computing multiple frames.
    **/
   template <typename VALUETYPE, typename ENERGYVTYPE>
-  void compute(
+  void compute_spin(
       ENERGYVTYPE &ener,
       std::vector<VALUETYPE> &force,
       std::vector<VALUETYPE> &force_mag,
@@ -1143,7 +1143,7 @@ class DeepPot {
     const VALUETYPE *fparam__ = !fparam_.empty() ? &fparam_[0] : nullptr;
     const VALUETYPE *aparam__ = !aparam_.empty() ? &aparam_[0] : nullptr;
 
-    _DP_DeepPotCompute<VALUETYPE>(
+    _DP_DeepPotComputeSP<VALUETYPE>(
         dp, nframes, natoms, coord_, spin_, atype_, box_, fparam__, aparam__,
         ener_, force_, force_mag_, virial_, atomic_ener_, atomic_virial_);
     DP_CHECK_OK(DP_DeepPotCheckOK, dp);
@@ -1217,7 +1217,7 @@ class DeepPot {
   };
   // support spin
   template <typename VALUETYPE, typename ENERGYVTYPE>
-  void compute(
+  void compute_spin(
       ENERGYVTYPE &ener,
       std::vector<VALUETYPE> &force,
       std::vector<VALUETYPE> &force_mag,
@@ -1341,7 +1341,7 @@ class DeepPot {
   };
   // support spin
   template <typename VALUETYPE, typename ENERGYVTYPE>
-  void compute(
+  void compute_spin(
       ENERGYVTYPE &ener,
       std::vector<VALUETYPE> &force,
       std::vector<VALUETYPE> &force_mag,
@@ -1940,7 +1940,7 @@ class DeepPotModelDevi {
   };
   // support spin
   template <typename VALUETYPE>
-  void compute(
+  void compute_spin(
       std::vector<double> &ener,
       std::vector<std::vector<VALUETYPE>> &force,
       std::vector<std::vector<VALUETYPE>> &force_mag,
@@ -2116,7 +2116,7 @@ class DeepPotModelDevi {
   };
   // support spin
   template <typename VALUETYPE>
-  void compute(
+  void compute_spin(
       std::vector<double> &ener,
       std::vector<std::vector<VALUETYPE>> &force,
       std::vector<std::vector<VALUETYPE>> &force_mag,
