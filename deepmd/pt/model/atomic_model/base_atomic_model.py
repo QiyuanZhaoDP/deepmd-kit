@@ -493,6 +493,12 @@ class BaseAtomicModel(torch.nn.Module, BaseAtomicModel_):
                     mixed_types=self.mixed_types(),
                     box=box,
                 )
+                assert fparam is None, "Model with data id must not have fparam!"
+                dataid_num, dataid_idx = self.get_dataid()
+                dataid = torch.eye(dataid_num, dtype=coord.dtype, device=coord.device)[
+                    dataid_idx
+                ]
+                fparam = torch.tile(dataid.reshape(1, -1), (coord.shape[0], 1))
                 atomic_ret = self.forward_common_atomic(
                     extended_coord,
                     extended_atype,

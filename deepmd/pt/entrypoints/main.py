@@ -381,6 +381,8 @@ def change_bias(FLAGS):
         "change-by-statistic" if FLAGS.mode == "change" else "set-by-statistic"
     )
     if multi_task:
+        model_keys = list(model_params["model_dict"].keys())
+        sorted_keys = sorted(model_keys)
         assert (
             model_branch is not None
         ), "For multitask model, the model branch must be set!"
@@ -396,6 +398,8 @@ def change_bias(FLAGS):
         else model_params["model_dict"][model_branch]["type_map"]
     )
     model_to_change = model if not multi_task else model[model_branch]
+    if multi_task:
+        model_to_change.set_dataid(len(sorted_keys), sorted_keys.index(model_branch))
     if FLAGS.INPUT.endswith(".pt"):
         wrapper = ModelWrapper(model)
         wrapper.load_state_dict(old_state_dict["model"])
