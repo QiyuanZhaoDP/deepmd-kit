@@ -231,12 +231,8 @@ class DescrptBlockSeAtten(DescriptorBlock):
             )
 
         wanted_shape = (self.ntypes, self.nnei, 4)
-        mean = torch.zeros(
-            wanted_shape, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE
-        )
-        stddev = torch.ones(
-            wanted_shape, dtype=env.GLOBAL_PT_FLOAT_PRECISION, device=env.DEVICE
-        )
+        mean = torch.zeros(wanted_shape, dtype=self.prec, device=env.DEVICE)
+        stddev = torch.ones(wanted_shape, dtype=self.prec, device=env.DEVICE)
         self.register_buffer("mean", mean)
         self.register_buffer("stddev", stddev)
         self.tebd_dim_input = self.tebd_dim if self.type_one_side else self.tebd_dim * 2

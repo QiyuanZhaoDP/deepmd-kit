@@ -129,6 +129,7 @@ class DescrptSeT(BaseDescriptor, torch.nn.Module):
             raise NotImplementedError("old implementation of spin is not supported.")
         super().__init__()
         self.type_map = type_map
+        self.prec = PRECISION_DICT[precision]
         self.seat = DescrptBlockSeT(
             rcut,
             rcut_smth,
@@ -300,7 +301,18 @@ class DescrptSeT(BaseDescriptor, torch.nn.Module):
             The smooth switch function.
 
         """
-        return self.seat.forward(nlist, coord_ext, atype_ext, None, mapping)
+        # cast the input to internal precsion
+        coord_ext = coord_ext.to(dtype=self.prec)
+        g1, rot_mat, g2, h2, sw = self.seat.forward(
+            nlist, coord_ext, atype_ext, None, mapping
+        )
+        return (
+            g1.to(dtype=env.GLOBAL_PT_FLOAT_PRECISION),
+            None,
+            None,
+            None,
+            sw.to(dtype=env.GLOBAL_PT_FLOAT_PRECISION),
+        )
 
     def set_stat_mean_and_stddev(
         self,
@@ -680,7 +692,6 @@ class DescrptBlockSeT(DescriptorBlock):
             protection=self.env_protection,
         )
         dmatrix = dmatrix.view(-1, self.nnei, 4)
-        dmatrix = dmatrix.to(dtype=self.prec)
         nfnl = dmatrix.shape[0]
         # pre-allocate a shape to pass jit
         result = torch.zeros(
@@ -718,7 +729,7 @@ class DescrptBlockSeT(DescriptorBlock):
         # xyz_scatter /= (self.nnei * self.nnei)
         result = result.view(nf, nloc, self.filter_neuron[-1])
         return (
-            result.to(dtype=env.GLOBAL_PT_FLOAT_PRECISION),
+            result,
             None,
             None,
             None,

@@ -97,6 +97,7 @@ class DescrptSeA(BaseDescriptor, torch.nn.Module):
             raise NotImplementedError("old implementation of spin is not supported.")
         super().__init__()
         self.type_map = type_map
+        self.prec = PRECISION_DICT[precision]
         self.sea = DescrptBlockSeA(
             rcut,
             rcut_smth,
@@ -270,7 +271,18 @@ class DescrptSeA(BaseDescriptor, torch.nn.Module):
             The smooth switch function.
 
         """
-        return self.sea.forward(nlist, coord_ext, atype_ext, None, mapping)
+        # cast the input to internal precsion
+        coord_ext = coord_ext.to(dtype=self.prec)
+        g1, rot_mat, g2, h2, sw = self.sea.forward(
+            nlist, coord_ext, atype_ext, None, mapping
+        )
+        return (
+            g1.to(dtype=env.GLOBAL_PT_FLOAT_PRECISION),
+            rot_mat.to(dtype=env.GLOBAL_PT_FLOAT_PRECISION),
+            None,
+            None,
+            sw.to(dtype=env.GLOBAL_PT_FLOAT_PRECISION),
+        )
 
     def set_stat_mean_and_stddev(
         self,
@@ -703,8 +715,8 @@ class DescrptBlockSeA(DescriptorBlock):
         result = result.view(nf, nloc, self.filter_neuron[-1] * self.axis_neuron)
         rot_mat = rot_mat.view([nf, nloc] + list(rot_mat.shape[1:]))  # noqa:RUF005
         return (
-            result.to(dtype=env.GLOBAL_PT_FLOAT_PRECISION),
-            rot_mat.to(dtype=env.GLOBAL_PT_FLOAT_PRECISION),
+            result,
+            rot_mat,
             None,
             None,
             sw,

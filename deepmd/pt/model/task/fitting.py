@@ -415,7 +415,11 @@ class GeneralFitting(Fitting):
         fparam: Optional[torch.Tensor] = None,
         aparam: Optional[torch.Tensor] = None,
     ):
-        xx = descriptor
+        # cast the input to internal precsion
+        xx = descriptor.to(self.prec)
+        fparam = fparam.to(self.prec) if fparam is not None else None
+        aparam = aparam.to(self.prec) if aparam is not None else None
+
         if self.remove_vaccum_contribution is not None:
             # TODO: compute the input for vaccm when remove_vaccum_contribution is set
             # Idealy, the input for vaccum should be computed;
@@ -488,49 +492,33 @@ class GeneralFitting(Fitting):
             dtype=env.GLOBAL_PT_FLOAT_PRECISION,
             device=descriptor.device,
         )  # jit assertion
-        if self.old_impl:
-            assert self.filter_layers_old is not None
-            assert xx_zeros is None
-            if self.mixed_types:
-                atom_property = self.filter_layers_old[0](xx) + self.bias_atom_e[atype]
-                outs = outs + atom_property  # Shape is [nframes, natoms[0], 1]
-            else:
-                for type_i, filter_layer in enumerate(self.filter_layers_old):
-                    mask = atype == type_i
-                    atom_property = filter_layer(xx)
-                    atom_property = atom_property + self.bias_atom_e[type_i]
-                    atom_property = atom_property * mask.unsqueeze(-1)
-                    outs = outs + atom_property  # Shape is [nframes, natoms[0], 1]
+        if self.mixed_types:
+            atom_property = self.filter_layers.networks[0](xx)
+            if xx_zeros is not None:
+                atom_property -= self.filter_layers.networks[0](xx_zeros)
+            outs = (
+                outs + atom_property + self.bias_atom_e[atype]
+            )  # Shape is [nframes, natoms[0], net_dim_out]
         else:
-            if self.mixed_types:
-                atom_property = (
-                    self.filter_layers.networks[0](xx) + self.bias_atom_e[atype]
-                )
+            for type_i, ll in enumerate(self.filter_layers.networks):
+                mask = (atype == type_i).unsqueeze(-1)
+                mask = torch.tile(mask, (1, 1, net_dim_out))
+                atom_property = ll(xx)
                 if xx_zeros is not None:
-                    atom_property -= self.filter_layers.networks[0](xx_zeros)
+                    # must assert, otherwise jit is not happy
+                    assert self.remove_vaccum_contribution is not None
+                    if not (
+                        len(self.remove_vaccum_contribution) > type_i
+                        and not self.remove_vaccum_contribution[type_i]
+                    ):
+                        atom_property -= ll(xx_zeros)
+                atom_property = atom_property + self.bias_atom_e[type_i]
+                atom_property = atom_property * mask
                 outs = (
                     outs + atom_property
                 )  # Shape is [nframes, natoms[0], net_dim_out]
-            else:
-                for type_i, ll in enumerate(self.filter_layers.networks):
-                    mask = (atype == type_i).unsqueeze(-1)
-                    mask = torch.tile(mask, (1, 1, net_dim_out))
-                    atom_property = ll(xx)
-                    if xx_zeros is not None:
-                        # must assert, otherwise jit is not happy
-                        assert self.remove_vaccum_contribution is not None
-                        if not (
-                            len(self.remove_vaccum_contribution) > type_i
-                            and not self.remove_vaccum_contribution[type_i]
-                        ):
-                            atom_property -= ll(xx_zeros)
-                    atom_property = atom_property + self.bias_atom_e[type_i]
-                    atom_property = atom_property * mask
-                    outs = (
-                        outs + atom_property
-                    )  # Shape is [nframes, natoms[0], net_dim_out]
         # nf x nloc
-        mask = self.emask(atype)
+        mask = self.emask(atype).to(torch.bool)
         # nf x nloc x nod
-        outs = outs * mask[:, :, None]
+        outs = torch.where(mask[:, :, None], outs, 0.0)
         return {self.var_name: outs.to(env.GLOBAL_PT_FLOAT_PRECISION)}
