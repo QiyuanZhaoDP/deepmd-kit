@@ -312,6 +312,11 @@ class Trainer:
 
         # Model
         self.model = get_model_for_wrapper(model_params)
+        if finetune_model is not None:
+            self.model.set_dataid(
+                self.finetune_links.pop("dataid_num"),
+                self.finetune_links.pop("head_idx"),
+            )
 
         # Loss
         if not self.multi_task:
@@ -1165,7 +1170,11 @@ class Trainer:
         input_dict = {item_key: None for item_key in input_keys}
         label_dict = {}
         nframes = batch_data["coord"].shape[0]
-        data_id_onehot = self.dataid[self.sorted_model_keys.index(task_key)]
+        if self.dataid is not None:
+            data_id_onehot = self.dataid[self.sorted_model_keys.index(task_key)]
+        else:
+            head_num, data_idx = self.model.get_dataid()
+            data_id_onehot = np.eye(head_num, dtype=float)[data_idx]
         batch_data["fparam"] = torch.tile(
             to_torch_tensor(data_id_onehot).unsqueeze(0), (nframes, 1)
         )

@@ -155,6 +155,10 @@ def get_finetune_rules(
             change_model_params=change_model_params,
         )
         finetune_links["Default"] = finetune_rule
+        if finetune_from_multi_task:
+            sorted_keys = sorted(last_model_params["model_dict"].keys())
+            finetune_links["dataid_num"] = len(sorted_keys)
+            finetune_links["head_idx"] = sorted_keys.index(model_branch)
     else:
         assert model_branch == "", (
             "Multi-task fine-tuning does not support command-line branches chosen!"
