@@ -16,6 +16,9 @@ from deepmd.pt.model.descriptor.descriptor import (
 from deepmd.pt.model.descriptor.env_mat import (
     prod_env_mat,
 )
+from deepmd.pt.model.network.basis import (
+    Fourier,
+)
 from deepmd.pt.model.network.mlp import (
     MLPLayer,
 )
@@ -90,6 +93,17 @@ class DescrptBlockRepformers(DescriptorBlock):
         update_g1_has_attn: bool = True,
         update_g2_has_g1g1: bool = True,
         update_g2_has_attn: bool = True,
+        has_angle: bool = True,
+        update_a_has_g1: bool = True,
+        update_a_has_g2: bool = True,
+        update_g2_has_a: bool = True,
+        update_g1_has_edge: bool = True,
+        update_g2_has_edge: bool = True,
+        a_dim: int = 64,
+        num_a: int = 9,
+        a_rcut: float = 4.0,
+        a_sel: int = 40,
+        angle_use_self_g2_padding: bool = True,
         update_h2: bool = False,
         attn1_hidden: int = 64,
         attn1_nhead: int = 4,
@@ -236,11 +250,34 @@ class DescrptBlockRepformers(DescriptorBlock):
         self.use_sqrt_nnei = use_sqrt_nnei
         self.g1_out_conv = g1_out_conv
         self.g1_out_mlp = g1_out_mlp
+        # angle information
+        self.has_angle = has_angle
+        self.update_a_has_g1 = update_a_has_g1
+        self.update_a_has_g2 = update_a_has_g2
+        self.update_g2_has_a = update_g2_has_a
+        self.update_g1_has_edge = update_g1_has_edge
+        self.update_g2_has_edge = update_g2_has_edge
+        self.a_dim = a_dim
+        self.num_a = num_a
+        self.a_rcut = a_rcut
+        self.a_sel = a_sel
+        self.angle_use_self_g2_padding = angle_use_self_g2_padding
+        self.prec = PRECISION_DICT[precision]
+        if num_a % 2 != 1:
+            raise ValueError(f"{num_a=} must be an odd integer")
+        circular_harmonics_order = (num_a - 1) // 2
+        self.fourier_expansion = Fourier(
+            order=circular_harmonics_order,
+            learnable=True,
+            precision=precision,
+        )
+        self.angle_embedding = torch.nn.Linear(
+            in_features=self.num_a, out_features=self.a_dim, bias=False, dtype=self.prec
+        )
         # order matters, placed after the assignment of self.ntypes
         self.reinit_exclude(exclude_types)
         self.env_protection = env_protection
         self.precision = precision
-        self.prec = PRECISION_DICT[precision]
         self.trainable_ln = trainable_ln
         self.ln_eps = ln_eps
         self.epsilon = 1e-4
@@ -267,6 +304,17 @@ class DescrptBlockRepformers(DescriptorBlock):
                     update_g1_has_attn=self.update_g1_has_attn,
                     update_g2_has_g1g1=self.update_g2_has_g1g1,
                     update_g2_has_attn=self.update_g2_has_attn,
+                    has_angle=self.has_angle,
+                    update_a_has_g1=self.update_a_has_g1,
+                    update_a_has_g2=self.update_a_has_g2,
+                    update_g2_has_a=self.update_g2_has_a,
+                    update_g1_has_edge=self.update_g1_has_edge,
+                    update_g2_has_edge=self.update_g2_has_edge,
+                    a_dim=self.a_dim,
+                    num_a=self.num_a,
+                    a_rcut=self.a_rcut,
+                    a_sel=self.a_sel,
+                    angle_use_self_g2_padding=self.angle_use_self_g2_padding,
                     update_h2=self.update_h2,
                     attn1_hidden=self.attn1_hidden,
                     attn1_nhead=self.attn1_nhead,
@@ -436,6 +484,46 @@ class DescrptBlockRepformers(DescriptorBlock):
         # nb x nloc x nnei x ng2
         g2 = self.act(self.g2_embd(g2))
 
+        # get angle nlist (maybe smaller)
+        a_dist_mask = (torch.linalg.norm(diff, dim=-1) < self.a_rcut)[
+            :, :, : self.a_sel
+        ]
+        angle_nlist = nlist[:, :, : self.a_sel]
+        angle_nlist = torch.where(a_dist_mask, angle_nlist, -1)
+        _, angle_diff, angle_sw = prod_env_mat(
+            extended_coord,
+            angle_nlist,
+            atype,
+            self.mean[:, : self.a_sel],
+            self.stddev[:, : self.a_sel],
+            self.a_rcut,
+            self.a_rcut - 0.5,
+            protection=self.env_protection,
+        )
+        angle_nlist_mask = angle_nlist != -1
+        angle_sw = torch.squeeze(angle_sw, -1)
+        # beyond the cutoff sw should be 0.0
+        angle_sw = angle_sw.masked_fill(~angle_nlist_mask, 0.0)
+        angle_nlist[angle_nlist == -1] = 0
+
+        # nf x nloc x a_nnei x 3
+        normalized_diff_i = angle_diff / (
+            torch.linalg.norm(angle_diff, dim=-1, keepdim=True) + 1e-6
+        )
+        # nf x nloc x 3 x a_nnei
+        normalized_diff_j = torch.transpose(normalized_diff_i, 2, 3)
+        # nf x nloc x a_nnei x a_nnei
+        # 1 - 1e-6 for torch.acos stability
+        cosine_ij = torch.matmul(normalized_diff_i, normalized_diff_j) * (1 - 1e-6)
+        # nf x nloc x a_nnei x a_nnei
+        angle = torch.acos(cosine_ij)
+        # (nf x nloc x a_nnei x a_nnei) x num_a
+        angle_basis = self.fourier_expansion(angle.view(-1))
+        # nf x nloc x a_nnei x a_nnei x a_dim
+        angle_embed = self.angle_embedding(angle_basis).reshape(
+            nframes, nloc, self.a_sel, self.a_sel, self.a_dim
+        )
+
         # set all padding positions to index of 0
         # if the a neighbor is real or not is indicated by nlist_mask
         nlist[nlist == -1] = 0
@@ -504,13 +592,17 @@ class DescrptBlockRepformers(DescriptorBlock):
                     g1_ext = concat_switch_virtual(
                         g1_real_ext, g1_virtual_ext, real_nloc
                     )
-            g1, g2, h2 = ll.forward(
+            g1, g2, h2, angle_embed = ll.forward(
                 g1_ext,
                 g2,
                 h2,
+                angle_embed,
                 nlist,
                 nlist_mask,
                 sw,
+                angle_nlist,
+                angle_nlist_mask,
+                angle_sw,
             )
 
         # nb x nloc x 3 x ng2
