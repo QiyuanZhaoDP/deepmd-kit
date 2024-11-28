@@ -500,22 +500,16 @@ class DescrptBlockRepformers(DescriptorBlock):
                 g2 = g2 / self.rcut
                 h2 = h2 / self.rcut
         if self.multiscale_mode.startswith("norm"):
-            scale = 2 ** torch.arange(
-                self.multi_g2_dim, dtype=g2.dtype, device=g2.device
+            scale = 1.0 / (
+                2 ** torch.arange(self.multi_g2_dim, dtype=g2.dtype, device=g2.device)
             )
             g2 = scale[None, None, None, :] * g2
-            # * sw.unsqueeze(-1) ? unsmooth but monotonic
-            # mean = scaled_g2.mean(dim=-1, keepdim=True)
-            # std = scaled_g2.std(dim=-1, keepdim=True)
-            # scaled_g2_normalized = (scaled_g2 - mean) / (std + 1e-6)
         elif self.multiscale_mode.startswith("sin"):
-            scale = 2 ** torch.arange(
-                self.multi_g2_dim, dtype=g2.dtype, device=g2.device
+            scale = 1.0 / (
+                2 ** torch.arange(self.multi_g2_dim, dtype=g2.dtype, device=g2.device)
             )
             g2_content = scale[None, None, None, :] * g2
-            g2 = torch.cat(
-                [g2, torch.sin(g2_content), torch.cos(g2_content)], dim=-1
-            ) * sw.unsqueeze(-1)
+            g2 = torch.cat([g2, torch.sin(g2_content), torch.cos(g2_content)], dim=-1)
         # nb x nloc x nnei x ng2
         g2 = self.act(self.g2_embd(g2))
 
