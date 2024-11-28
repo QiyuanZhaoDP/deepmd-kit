@@ -1265,6 +1265,18 @@ def dpa2_repformer_args():
             default=False,
         ),
         Argument(
+            "scale_dist",
+            bool,
+            optional=True,
+            default=True,
+        ),
+        Argument(
+            "multiscale_mode",
+            str,
+            optional=True,
+            default="None",
+        ),
+        Argument(
             "update_g1_has_conv",
             bool,
             optional=True,

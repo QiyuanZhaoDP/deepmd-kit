@@ -125,6 +125,8 @@ class DescrptBlockRepformers(DescriptorBlock):
         use_sqrt_nnei: bool = True,
         g1_out_conv: bool = True,
         g1_out_mlp: bool = True,
+        scale_dist: bool = True,
+        multiscale_mode: str = "None",
     ) -> None:
         r"""
         The repformer descriptor block.
@@ -262,6 +264,8 @@ class DescrptBlockRepformers(DescriptorBlock):
         self.a_rcut = a_rcut
         self.a_sel = a_sel
         self.angle_use_self_g2_padding = angle_use_self_g2_padding
+        self.scale_dist = scale_dist
+        self.multiscale_mode = multiscale_mode
         self.prec = PRECISION_DICT[precision]
         if num_a % 2 != 1:
             raise ValueError(f"{num_a=} must be an odd integer")
@@ -283,8 +287,21 @@ class DescrptBlockRepformers(DescriptorBlock):
         self.epsilon = 1e-4
         self.seed = seed
 
+        self.g2_in_dim = 1
+        self.multi_g2_dim = 0
+        if self.multiscale_mode.startswith("norm"):
+            # 4 for 1, 2, 4, 8
+            self.multi_g2_dim = int(self.multiscale_mode.split(":")[-1])
+            self.g2_in_dim = self.multi_g2_dim
+        elif self.multiscale_mode.startswith("sin"):
+            self.multi_g2_dim = int(self.multiscale_mode.split(":")[-1])
+            # 4 for 1 + (1, 2, 4, 8) * 2
+            self.g2_in_dim += int(self.multiscale_mode.split(":")[-1]) * 2
+        else:
+            assert self.multiscale_mode == "None", "unsupported multiscale mode"
+
         self.g2_embd = MLPLayer(
-            1, self.g2_dim, precision=precision, seed=child_seed(seed, 0)
+            self.g2_in_dim, self.g2_dim, precision=precision, seed=child_seed(seed, 0)
         )
         layers = []
         for ii in range(nlayers):
@@ -479,8 +496,26 @@ class DescrptBlockRepformers(DescriptorBlock):
             g2, h2 = torch.split(dmatrix, [1, 3], dim=-1)
         else:
             g2, h2 = torch.linalg.norm(diff, dim=-1, keepdim=True), diff
-            g2 = g2 / self.rcut
-            h2 = h2 / self.rcut
+            if self.scale_dist:
+                g2 = g2 / self.rcut
+                h2 = h2 / self.rcut
+        if self.multiscale_mode.startswith("norm"):
+            scale = 2 ** torch.arange(
+                self.multi_g2_dim, dtype=g2.dtype, device=g2.device
+            )
+            g2 = scale[None, None, None, :] * g2
+            # * sw.unsqueeze(-1) ? unsmooth but monotonic
+            # mean = scaled_g2.mean(dim=-1, keepdim=True)
+            # std = scaled_g2.std(dim=-1, keepdim=True)
+            # scaled_g2_normalized = (scaled_g2 - mean) / (std + 1e-6)
+        elif self.multiscale_mode.startswith("sin"):
+            scale = 2 ** torch.arange(
+                self.multi_g2_dim, dtype=g2.dtype, device=g2.device
+            )
+            g2_content = scale[None, None, None, :] * g2
+            g2 = torch.cat(
+                [g2, torch.sin(g2_content), torch.cos(g2_content)], dim=-1
+            ) * sw.unsqueeze(-1)
         # nb x nloc x nnei x ng2
         g2 = self.act(self.g2_embd(g2))
 
