@@ -1271,6 +1271,12 @@ def dpa2_repformer_args():
             default=True,
         ),
         Argument(
+            "angle_only_cos",
+            bool,
+            optional=True,
+            default=False,
+        ),
+        Argument(
             "multiscale_mode",
             str,
             optional=True,

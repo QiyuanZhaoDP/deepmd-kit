@@ -226,6 +226,7 @@ class RepformerArgs:
         g1_out_mlp: bool = True,
         scale_dist: bool = True,
         multiscale_mode: str = "None",
+        angle_only_cos: bool = False,
         ln_eps: Optional[float] = 1e-5,
     ) -> None:
         r"""The constructor for the RepformerArgs class which defines the parameters of the repformer block in DPA2 descriptor.
@@ -341,6 +342,7 @@ class RepformerArgs:
         self.g1_out_mlp = g1_out_mlp
         self.scale_dist = scale_dist
         self.multiscale_mode = multiscale_mode
+        self.angle_only_cos = angle_only_cos
         #  to keep consistent with default value in this backends
         if ln_eps is None:
             ln_eps = 1e-5

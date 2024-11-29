@@ -253,6 +253,7 @@ class DescrptDPA2(BaseDescriptor, torch.nn.Module):
             g1_out_mlp=self.repformer_args.g1_out_mlp,
             scale_dist=self.repformer_args.scale_dist,
             multiscale_mode=self.repformer_args.multiscale_mode,
+            angle_only_cos=self.repformer_args.angle_only_cos,
             seed=child_seed(seed, 1),
         )
         self.rcsl_list = [

@@ -127,6 +127,7 @@ class DescrptBlockRepformers(DescriptorBlock):
         g1_out_mlp: bool = True,
         scale_dist: bool = True,
         multiscale_mode: str = "None",
+        angle_only_cos: bool = False,
     ) -> None:
         r"""
         The repformer descriptor block.
@@ -267,16 +268,24 @@ class DescrptBlockRepformers(DescriptorBlock):
         self.scale_dist = scale_dist
         self.multiscale_mode = multiscale_mode
         self.prec = PRECISION_DICT[precision]
+        self.angle_only_cos = angle_only_cos
         if num_a % 2 != 1:
             raise ValueError(f"{num_a=} must be an odd integer")
         circular_harmonics_order = (num_a - 1) // 2
         self.fourier_expansion = Fourier(
             order=circular_harmonics_order,
             learnable=True,
+            angle_only_cos=angle_only_cos,
             precision=precision,
         )
+        self.angle_embedding_in_features = self.num_a
+        if self.angle_only_cos:
+            self.angle_embedding_in_features = 1 + circular_harmonics_order
         self.angle_embedding = torch.nn.Linear(
-            in_features=self.num_a, out_features=self.a_dim, bias=False, dtype=self.prec
+            in_features=self.angle_embedding_in_features,
+            out_features=self.a_dim,
+            bias=False,
+            dtype=self.prec,
         )
         # order matters, placed after the assignment of self.ntypes
         self.reinit_exclude(exclude_types)

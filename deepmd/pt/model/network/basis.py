@@ -22,7 +22,12 @@ class Fourier(nn.Module):
     """Fourier Expansion for angle features."""
 
     def __init__(
-        self, *, order: int = 5, learnable: bool = False, precision="float64"
+        self,
+        *,
+        order: int = 5,
+        learnable: bool = False,
+        angle_only_cos: bool = False,
+        precision="float64",
     ) -> None:
         """Initialize the Fourier expansion.
 
@@ -36,6 +41,7 @@ class Fourier(nn.Module):
         self.order = order
         self.precision = precision
         self.prec = PRECISION_DICT[self.precision]
+        self.angle_only_cos = angle_only_cos
         # Initialize frequencies at canonical
         if learnable:
             self.frequencies = torch.nn.Parameter(
@@ -50,13 +56,15 @@ class Fourier(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         """Apply Fourier expansion to a feature Tensor."""
-        result = x.new_zeros(x.shape[0], 1 + 2 * self.order)
+        out_size = 1 + 2 * self.order if not self.angle_only_cos else 1 + self.order
+        result = x.new_zeros(x.shape[0], out_size)
         result[:, 0] = 1 / torch.sqrt(
             torch.tensor([2], device=result.device, dtype=result.dtype)
         )
         tmp = torch.outer(x, self.frequencies)
-        result[:, 1 : self.order + 1] = torch.sin(tmp)
-        result[:, self.order + 1 :] = torch.cos(tmp)
+        result[:, 1 : self.order + 1] = torch.cos(tmp)
+        if not self.angle_only_cos:
+            result[:, self.order + 1 :] = torch.sin(tmp)
         return result / (torch.pi**0.5)
 
 
