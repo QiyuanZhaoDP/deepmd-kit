@@ -19,9 +19,9 @@ from ase.calculators.calculator import (
     all_changes,
 )
 
-from deepmd.infer import (
-    DeepPot,
-)
+#from deepmd.infer import DeepPot
+
+from deepmd.infer import DeepEval as DeepPot
 
 if TYPE_CHECKING:
     from ase import (
@@ -83,13 +83,14 @@ class DP(Calculator):
     def __init__(
         self,
         model: Union[str, "Path"],
+        head: str = 'Domains_Drug',
         label: str = "DP",
         type_dict: Optional[Dict[str, int]] = None,
         neighbor_list=None,
         **kwargs,
     ) -> None:
         Calculator.__init__(self, label=label, **kwargs)
-        self.dp = DeepPot(str(Path(model).resolve()), neighbor_list=neighbor_list)
+        self.dp = DeepPot(str(Path(model).resolve()), neighbor_list=neighbor_list, head=head)
         if type_dict:
             self.type_dict = type_dict
         else:
