@@ -655,8 +655,8 @@ def main_parser() -> argparse.ArgumentParser:
         "--type-map",
         type=str,
         nargs="+",
-        required=False,
-        help="Type map. If not provided, the type map of data will be used.",
+        required=True,
+        help="type map",
     )
     parser_neighbor_stat.add_argument(
         "--mixed-type",
@@ -835,7 +835,7 @@ def main_parser() -> argparse.ArgumentParser:
     parser_show = subparsers.add_parser(
         "show",
         parents=[parser_log],
-        help="Show the information of a model",
+        help="(Supported backend: PyTorch) Show the information of a model",
         formatter_class=RawTextArgumentDefaultsHelpFormatter,
         epilog=textwrap.dedent(
             """\
@@ -880,21 +880,15 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     return parsed_args
 
 
-def main(args: Optional[List[str]] = None):
+def main():
     """DeePMD-kit new entry point.
-
-    Parameters
-    ----------
-    args : List[str]
-        list of command line arguments, main purpose is testing default option None
-        takes arguments from sys.argv
 
     Raises
     ------
     RuntimeError
         if no command was input
     """
-    args = parse_args(args=args)
+    args = parse_args()
 
     if args.backend not in BACKEND_TABLE:
         raise ValueError(f"Unknown backend {args.backend}")
@@ -906,7 +900,6 @@ def main(args: Optional[List[str]] = None):
         "neighbor-stat",
         "gui",
         "convert-backend",
-        "show",
     ):
         # common entrypoints
         from deepmd.entrypoints.main import main as deepmd_main
@@ -917,6 +910,7 @@ def main(args: Optional[List[str]] = None):
         "compress",
         "convert-from",
         "train-nvnmd",
+        "show",
         "change-bias",
     ):
         deepmd_main = BACKENDS[args.backend]().entry_point_hook

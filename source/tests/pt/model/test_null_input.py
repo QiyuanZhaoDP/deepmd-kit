@@ -5,6 +5,9 @@ import unittest
 import numpy as np
 import torch
 
+from deepmd.pt.infer.deep_eval import (
+    eval_model,
+)
 from deepmd.pt.model.model import (
     get_model,
     get_zbl_model,
@@ -18,9 +21,6 @@ from deepmd.pt.utils.utils import (
 
 from ...seed import (
     GLOBAL_SEED,
-)
-from ..common import (
-    eval_model,
 )
 from .test_permutation import (
     model_dpa1,

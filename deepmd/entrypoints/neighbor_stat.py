@@ -2,7 +2,6 @@
 import logging
 from typing import (
     List,
-    Optional,
 )
 
 from deepmd.backend.backend import (
@@ -22,7 +21,7 @@ def neighbor_stat(
     *,
     system: str,
     rcut: float,
-    type_map: Optional[List[str]],
+    type_map: List[str],
     mixed_type: bool = False,
     backend: str = "tensorflow",
     **kwargs,
@@ -89,8 +88,6 @@ def neighbor_stat(
         rcut=rcut,
         type_map=type_map,
     )
-    if type_map is None:
-        log.info(f"type_map: {data.get_type_map()}")
     data.get_batch()
     nei = NeighborStat(data.get_ntypes(), rcut, mixed_type=mixed_type)
     min_nbor_dist, max_nbor_size = nei.get_stat(data)

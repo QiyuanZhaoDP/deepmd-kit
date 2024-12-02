@@ -31,29 +31,36 @@ if INSTALLED_TF:
     from deepmd.tf.model.model import Model as FrozenModelTF
 else:
     FrozenModelTF = None
+from pathlib import (
+    Path,
+)
 
+from deepmd.entrypoints.convert_backend import (
+    convert_backend,
+)
 from deepmd.utils.argcheck import (
     model_args,
 )
 
-from ...infer.case import (
-    get_cases,
-)
-
+original_model = str(Path(__file__).parent.parent.parent / "infer" / "deeppot.dp")
 pt_model = "deeppot_for_consistent_frozen.pth"
 tf_model = "deeppot_for_consistent_frozen.pb"
-dp_model = "deeppot_for_consistent_frozen.dp"
+dp_model = original_model
 
 
 def setUpModule():
-    case = get_cases()["se_e2_a"]
-    case.get_model(".dp", dp_model)
-    case.get_model(".pb", tf_model)
-    case.get_model(".pth", pt_model)
+    convert_backend(
+        INPUT=dp_model,
+        OUTPUT=tf_model,
+    )
+    convert_backend(
+        INPUT=dp_model,
+        OUTPUT=pt_model,
+    )
 
 
 def tearDownModule():
-    for model_file in (dp_model, pt_model, tf_model):
+    for model_file in (pt_model, tf_model):
         try:
             os.remove(model_file)
         except FileNotFoundError:

@@ -63,7 +63,6 @@ class TestDescrptSeR(unittest.TestCase, TestCaseSingleFrameWithNlist):
                 resnet_dt=idt,
                 old_impl=False,
                 exclude_mask=em,
-                seed=GLOBAL_SEED,
             ).to(env.DEVICE)
             dd0.mean = torch.tensor(davg, dtype=dtype, device=env.DEVICE)
             dd0.dstd = torch.tensor(dstd, dtype=dtype, device=env.DEVICE)
@@ -131,7 +130,6 @@ class TestDescrptSeR(unittest.TestCase, TestCaseSingleFrameWithNlist):
                 precision=prec,
                 resnet_dt=idt,
                 old_impl=False,
-                seed=GLOBAL_SEED,
             )
             dd0.mean = torch.tensor(davg, dtype=dtype, device=env.DEVICE)
             dd0.dstd = torch.tensor(dstd, dtype=dtype, device=env.DEVICE)
@@ -182,7 +180,6 @@ class TestDescrptSeR(unittest.TestCase, TestCaseSingleFrameWithNlist):
                 precision=prec,
                 resnet_dt=idt,
                 old_impl=False,
-                seed=GLOBAL_SEED,
             )
             dd0.mean = torch.tensor(davg, dtype=dtype, device=env.DEVICE)
             dd0.dstd = torch.tensor(dstd, dtype=dtype, device=env.DEVICE)

@@ -512,11 +512,10 @@ class DescrptSeR(DescrptSe):
         """
         [net_deriv] = tf.gradients(atom_ener, self.descrpt_reshape)
         tf.summary.histogram("net_derivative", net_deriv)
-        nf = tf.shape(self.nlist)[0]
         net_deriv_reshape = tf.reshape(
             net_deriv,
             [
-                nf,
+                np.asarray(-1, dtype=np.int64),
                 natoms[0] * np.asarray(self.ndescrpt, dtype=np.int64),
             ],
         )

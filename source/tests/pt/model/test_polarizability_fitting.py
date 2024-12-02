@@ -77,7 +77,6 @@ class TestPolarFitting(unittest.TestCase, TestCaseSingleFrameWithNlist):
                 mixed_types=self.dd0.mixed_types(),
                 fit_diag=fit_diag,
                 scale=scale,
-                seed=GLOBAL_SEED,
             ).to(env.DEVICE)
             ft1 = DPPolarFitting.deserialize(ft0.serialize())
             ft2 = PolarFittingNet.deserialize(ft0.serialize())
@@ -144,7 +143,6 @@ class TestPolarFitting(unittest.TestCase, TestCaseSingleFrameWithNlist):
                 numb_aparam=nap,
                 mixed_types=mixed_types,
                 fit_diag=fit_diag,
-                seed=GLOBAL_SEED,
             ).to(env.DEVICE)
             torch.jit.script(ft0)
 
@@ -188,7 +186,6 @@ class TestEquivalence(unittest.TestCase):
                 mixed_types=self.dd0.mixed_types(),
                 fit_diag=fit_diag,
                 scale=scale,
-                seed=GLOBAL_SEED,
             ).to(env.DEVICE)
             if nfp > 0:
                 ifp = torch.tensor(
@@ -251,7 +248,6 @@ class TestEquivalence(unittest.TestCase):
                 mixed_types=self.dd0.mixed_types(),
                 fit_diag=fit_diag,
                 scale=scale,
-                seed=GLOBAL_SEED,
             ).to(env.DEVICE)
             res = []
             for idx_perm in [[0, 1, 2, 3, 4], [1, 0, 4, 3, 2]]:
@@ -302,7 +298,6 @@ class TestEquivalence(unittest.TestCase):
                 mixed_types=self.dd0.mixed_types(),
                 fit_diag=fit_diag,
                 scale=scale,
-                seed=GLOBAL_SEED,
             ).to(env.DEVICE)
             res = []
             for xyz in [self.coord, coord_s]:
@@ -352,7 +347,6 @@ class TestPolarModel(unittest.TestCase):
             numb_fparam=0,
             numb_aparam=0,
             mixed_types=self.dd0.mixed_types(),
-            seed=GLOBAL_SEED,
         ).to(env.DEVICE)
         self.type_mapping = ["O", "H", "B"]
         self.model = PolarModel(self.dd0, self.ft0, self.type_mapping)

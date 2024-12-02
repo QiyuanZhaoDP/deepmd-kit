@@ -13,7 +13,6 @@ from deepmd.utils.argcheck import (
 )
 
 from .common import (
-    INSTALLED_JAX,
     INSTALLED_PT,
     INSTALLED_TF,
     CommonTest,
@@ -31,13 +30,6 @@ if INSTALLED_TF:
     from deepmd.tf.utils.type_embed import TypeEmbedNet as TypeEmbedNetTF
 else:
     TypeEmbedNetTF = object
-if INSTALLED_JAX:
-    from deepmd.jax.env import (
-        jnp,
-    )
-    from deepmd.jax.utils.type_embed import TypeEmbedNet as TypeEmbedNetJAX
-else:
-    TypeEmbedNetJAX = object
 
 
 @parameterized(
@@ -71,9 +63,7 @@ class TestTypeEmbedding(CommonTest, unittest.TestCase):
     tf_class = TypeEmbedNetTF
     dp_class = TypeEmbedNetDP
     pt_class = TypeEmbedNetPT
-    jax_class = TypeEmbedNetJAX
     args = type_embedding_args()
-    skip_jax = not INSTALLED_JAX
 
     @property
     def addtional_data(self) -> dict:
@@ -112,14 +102,6 @@ class TestTypeEmbedding(CommonTest, unittest.TestCase):
             x.detach().cpu().numpy() if torch.is_tensor(x) else x
             for x in (pt_obj(device=PT_DEVICE),)
         ]
-
-    def eval_jax(self, jax_obj: Any) -> Any:
-        out = jax_obj()
-        # ensure output is not numpy array
-        for x in (out,):
-            if isinstance(x, np.ndarray):
-                raise ValueError("Output is numpy array")
-        return [np.array(x) if isinstance(x, jnp.ndarray) else x for x in (out,)]
 
     def extract_ret(self, ret: Any, backend) -> Tuple[np.ndarray, ...]:
         return (ret[0],)

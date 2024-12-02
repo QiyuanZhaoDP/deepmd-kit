@@ -23,15 +23,11 @@ from .se_r import (
 from .se_t import (
     DescrptSeT,
 )
-from .se_t_tebd import (
-    DescrptSeTTebd,
-)
 
 __all__ = [
     "DescrptSeA",
     "DescrptSeR",
     "DescrptSeT",
-    "DescrptSeTTebd",
     "DescrptDPA1",
     "DescrptSeAttenV2",
     "DescrptDPA2",

@@ -28,7 +28,6 @@ from deepmd.pt.loss import (
     DOSLoss,
     EnergySpinLoss,
     EnergyStdLoss,
-    PropertyLoss,
     TensorLoss,
 )
 from deepmd.pt.model.model import (
@@ -82,8 +81,11 @@ from deepmd.utils.path import (
     DPH5Path,
 )
 
-log = logging.getLogger(__name__)
+import wandb
 
+log = logging.getLogger(__name__)
+BATCH_SIZE = 20
+WANDB_NAME = "head:Drug-finetuning"
 
 class Trainer:
     def __init__(
@@ -100,6 +102,7 @@ class Trainer:
         finetune_links=None,
         init_frz_model=None,
     ):
+        
         """Construct a DeePMD trainer.
 
         Args:
@@ -484,7 +487,7 @@ class Trainer:
                             if i != "_extra_state" and f".{_model_key}." in i
                         ]
                         for item_key in target_keys:
-                            if _new_fitting and (".descriptor." not in item_key):
+                            if _new_fitting and ".fitting_net." in item_key:
                                 # print(f'Keep {item_key} in old model!')
                                 _new_state_dict[item_key] = (
                                     _random_state_dict[item_key].clone().detach()
@@ -625,6 +628,9 @@ class Trainer:
         self.profiling = training_params.get("profiling", False)
         self.profiling_file = training_params.get("profiling_file", "timeline.json")
 
+        self.log_run = wandb.init(project="dpa2", entity="deep-principle", name=WANDB_NAME)
+        wandb.run.define_metric("num_samples")
+
     def run(self):
         fout = (
             open(
@@ -662,6 +668,7 @@ class Trainer:
 
         def step(_step_id, task_key="Default"):
             # PyTorch Profiler
+                    
             if self.enable_profiler or self.profiling:
                 prof.step()
             self.wrapper.train()
@@ -689,6 +696,19 @@ class Trainer:
                     **input_dict, cur_lr=pref_lr, label=label_dict, task_key=task_key
                 )
                 loss.backward()
+
+                self.log_run.log({"num_samples": _step_id * BATCH_SIZE,
+                                  "lr": pref_lr,
+                                  "train_loss": loss.item(),
+                                  "train_ener_loss": more_loss["l2_ener_loss"].item(),
+                                  "train_force_loss": more_loss["l2_force_loss"].item(),
+                                  "train_force_mae": torch.abs(model_pred["force"] - label_dict["force"]).sum().item() / model_pred["force"].size(0) / model_pred["force"].size(1),
+                                  "train_energy_mae": torch.mean(torch.abs(model_pred["energy"] - label_dict["energy"])),
+                                  "train_force_cos": torch.mean(torch.abs(
+                            torch.cosine_similarity(
+                                model_pred["force"], label_dict["force"], dim=-1
+                            )))})
+
                 if self.gradient_max_norm > 0.0:
                     grad_norm = torch.nn.utils.clip_grad_norm_(
                         self.wrapper.parameters(), self.gradient_max_norm
@@ -772,6 +792,53 @@ class Trainer:
             # Log and persist
             if self.display_in_training and _step_id % self.disp_freq == 0:
                 self.wrapper.eval()
+
+                def get_valid_mae(_step_id, task_key="Default"):
+                    num_samples = _step_id * BATCH_SIZE
+                    total_mae_e = 0
+                    total_mae_f = 0
+                    total_mae_fcos = 0
+                    total_loss = []
+                    ener_loss = []
+                    force_loss = []
+                    num = 0
+                    num_atoms = 0
+
+                    for _ in range(50):
+                        input_dict, label_dict, _ = self.get_data(
+                            is_train=False, task_key=task_key
+                        )
+                        model_pred, loss, more_loss = self.wrapper(
+                                **input_dict, cur_lr=pref_lr, label=label_dict, task_key=task_key
+                            )
+                        mae_e = torch.abs(model_pred["energy"] - label_dict["energy"])
+                        mae_f = torch.abs(model_pred["force"] - label_dict["force"])
+                        total_mae_e += mae_e.sum().item()
+                        total_mae_f += mae_f.sum().item()
+                        num += mae_e.size(0)
+                        num_atoms += mae_f.size(0) * mae_f.size(1)
+                        mae_fcos = torch.abs(
+                            torch.cosine_similarity(
+                                model_pred["force"], label_dict["force"], dim=-1
+                            )
+                        )
+                        total_mae_fcos += mae_fcos.sum().item()
+                        total_loss.append(loss.item())
+                        ener_loss.append(more_loss["l2_ener_loss"].item())
+                        force_loss.append(more_loss["l2_force_loss"].item())
+                    
+                    self.log_run.log({"valid_force_mae": total_mae_f / num_atoms,
+                                      "valid_energy_mae": total_mae_e / num,
+                                      "num_samples": num_samples,
+                                      "valid_force_cos": total_mae_fcos / num_atoms,
+                                      "valid_loss": np.mean(total_loss),
+                                      "valid_ener_loss": np.mean(ener_loss),
+                                      "valid_force_loss": np.mean(force_loss),
+                                      "lr": pref_lr})
+
+                # if _step_id % 500 == 0:
+                #     get_valid_mae(_step_id, task_key)
+                get_valid_mae(_step_id, task_key)
 
                 def log_loss_train(_loss, _more_loss, _task_key="Default"):
                     results = {}
@@ -1030,13 +1097,10 @@ class Trainer:
             if dist.is_available() and dist.is_initialized()
             else self.wrapper
         )
-        module.train_infos["lr"] = float(lr)
+        module.train_infos["lr"] = lr
         module.train_infos["step"] = step
-        optim_state_dict = deepcopy(self.optimizer.state_dict())
-        for item in optim_state_dict["param_groups"]:
-            item["lr"] = float(item["lr"])
         torch.save(
-            {"model": module.state_dict(), "optimizer": optim_state_dict},
+            {"model": module.state_dict(), "optimizer": self.optimizer.state_dict()},
             save_path,
         )
         checkpoint_dir = save_path.parent
@@ -1243,10 +1307,6 @@ def get_loss(loss_params, start_lr, _ntypes, _model):
         loss_params["label_name"] = label_name
         loss_params["tensor_name"] = label_name
         return TensorLoss(**loss_params)
-    elif loss_type == "property":
-        task_dim = _model.get_task_dim()
-        loss_params["task_dim"] = task_dim
-        return PropertyLoss(**loss_params)
     else:
         raise NotImplementedError
 

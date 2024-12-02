@@ -14,9 +14,6 @@ from typing import (
 import numpy as np
 import torch
 
-from deepmd.dpmodel.output_def import (
-    FittingOutputDef,
-)
 from deepmd.pt.utils import (
     AtomExcludeMask,
 )
@@ -187,8 +184,8 @@ def _compute_model_predict(
 
 def _make_preset_out_bias(
     ntypes: int,
-    ibias: List[Optional[np.ndarray]],
-) -> Optional[np.ndarray]:
+    ibias: List[Optional[np.array]],
+) -> Optional[np.array]:
     """Make preset out bias.
 
     output:
@@ -242,9 +239,8 @@ def compute_output_stats(
     keys: Union[str, List[str]] = ["energy"],
     stat_file_path: Optional[DPPath] = None,
     rcond: Optional[float] = None,
-    preset_bias: Optional[Dict[str, List[Optional[np.ndarray]]]] = None,
+    preset_bias: Optional[Dict[str, List[Optional[torch.Tensor]]]] = None,
     model_forward: Optional[Callable[..., torch.Tensor]] = None,
-    atomic_output: Optional[FittingOutputDef] = None,
 ):
     """
     Compute the output statistics (e.g. energy bias) for the fitting net from packed data.
@@ -264,9 +260,9 @@ def compute_output_stats(
         The path to the stat file.
     rcond : float, optional
         The condition number for the regression of atomic energy.
-    preset_bias : Dict[str, List[Optional[np.ndarray]]], optional
+    preset_bias : Dict[str, List[Optional[torch.Tensor]]], optional
         Specifying atomic energy contribution in vacuum. Given by key:value pairs.
-        The value is a list specifying the bias. the elements can be None or np.ndarray of output shape.
+        The value is a list specifying the bias. the elements can be None or np.array of output shape.
         For example: [None, [2.]] means type 0 is not set, type 1 is set to [2.]
         The `set_davg_zero` key in the descrptor should be set.
     model_forward : Callable[..., torch.Tensor], optional
@@ -274,8 +270,6 @@ def compute_output_stats(
         If not None, the model will be utilized to generate the original energy prediction,
         which will be subtracted from the energy label of the data.
         The difference will then be used to calculate the delta complement energy bias for each type.
-    atomic_output : FittingOutputDef, optional
-        The output of atomic model.
     """
     # try to restore the bias from stat file
     bias_atom_e, std_atom_e = _restore_from_file(stat_file_path, keys)
@@ -364,7 +358,6 @@ def compute_output_stats(
             rcond,
             preset_bias,
             model_pred_g,
-            atomic_output,
         )
         bias_atom_a, std_atom_a = compute_output_stats_atomic(
             sampled,
@@ -405,9 +398,8 @@ def compute_output_stats_global(
     ntypes: int,
     keys: List[str],
     rcond: Optional[float] = None,
-    preset_bias: Optional[Dict[str, List[Optional[np.ndarray]]]] = None,
+    preset_bias: Optional[Dict[str, List[Optional[torch.Tensor]]]] = None,
     model_pred: Optional[Dict[str, np.ndarray]] = None,
-    atomic_output: Optional[FittingOutputDef] = None,
 ):
     """This function only handle stat computation from reduced global labels."""
     # return directly if model predict is empty for global
@@ -478,13 +470,6 @@ def compute_output_stats_global(
     std_atom_e = {}
     for kk in keys:
         if kk in stats_input:
-            if atomic_output is not None and atomic_output.get_data()[kk].intensive:
-                task_dim = stats_input[kk].shape[1]
-                assert merged_natoms[kk].shape == (nf[kk], ntypes)
-                stats_input[kk] = (
-                    merged_natoms[kk].sum(axis=1).reshape(-1, 1) * stats_input[kk]
-                )
-                assert stats_input[kk].shape == (nf[kk], task_dim)
             bias_atom_e[kk], std_atom_e[kk] = compute_stats_from_redu(
                 stats_input[kk],
                 merged_natoms[kk],

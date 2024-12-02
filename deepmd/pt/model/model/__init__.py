@@ -60,9 +60,6 @@ from .model import (
 from .polar_model import (
     PolarModel,
 )
-from .property_model import (
-    PropertyModel,
-)
 from .spin_model import (
     SpinEnergyModel,
     SpinModel,
@@ -151,38 +148,6 @@ def get_zbl_model(model_params):
     )
 
 
-def _can_be_converted_to_float(value):
-    try:
-        float(value)
-        return True
-    except (TypeError, ValueError):
-        # return false for any failure...
-        return False
-
-
-def _convert_preset_out_bias_to_array(preset_out_bias, type_map):
-    if preset_out_bias is not None:
-        for kk in preset_out_bias:
-            if len(preset_out_bias[kk]) != len(type_map):
-                raise ValueError(
-                    "length of the preset_out_bias should be the same as the type_map"
-                )
-            for jj in range(len(preset_out_bias[kk])):
-                if preset_out_bias[kk][jj] is not None:
-                    if isinstance(preset_out_bias[kk][jj], list):
-                        bb = preset_out_bias[kk][jj]
-                    elif _can_be_converted_to_float(preset_out_bias[kk][jj]):
-                        bb = [float(preset_out_bias[kk][jj])]
-                    else:
-                        raise ValueError(
-                            f"unsupported type/value of the {jj}th element of "
-                            f"preset_out_bias['{kk}'] "
-                            f"{type(preset_out_bias[kk][jj])}"
-                        )
-                    preset_out_bias[kk][jj] = np.array(bb)
-    return preset_out_bias
-
-
 def get_standard_model(model_params):
     model_params_old = model_params
     model_params = copy.deepcopy(model_params)
@@ -208,10 +173,6 @@ def get_standard_model(model_params):
     fitting = BaseFitting(**fitting_net)
     atom_exclude_types = model_params.get("atom_exclude_types", [])
     pair_exclude_types = model_params.get("pair_exclude_types", [])
-    preset_out_bias = model_params.get("preset_out_bias")
-    preset_out_bias = _convert_preset_out_bias_to_array(
-        preset_out_bias, model_params["type_map"]
-    )
 
     if fitting_net["type"] == "dipole":
         modelcls = DipoleModel
@@ -221,8 +182,6 @@ def get_standard_model(model_params):
         modelcls = DOSModel
     elif fitting_net["type"] in ["ener", "direct_force_ener"]:
         modelcls = EnergyModel
-    elif fitting_net["type"] == "property":
-        modelcls = PropertyModel
     else:
         raise RuntimeError(f"Unknown fitting type: {fitting_net['type']}")
 
@@ -232,7 +191,6 @@ def get_standard_model(model_params):
         type_map=model_params["type_map"],
         atom_exclude_types=atom_exclude_types,
         pair_exclude_types=pair_exclude_types,
-        preset_out_bias=preset_out_bias,
     )
     model.model_def_script = json.dumps(model_params_old)
     return model

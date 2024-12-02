@@ -8,7 +8,6 @@ from deepmd.pt.model.descriptor import (
     DescrptSeA,
     DescrptSeR,
     DescrptSeT,
-    DescrptSeTTebd,
 )
 
 from ....consistent.common import (
@@ -25,7 +24,6 @@ from ...dpmodel.descriptor.test_descriptor import (
     DescriptorParamSeA,
     DescriptorParamSeR,
     DescriptorParamSeT,
-    DescriptorParamSeTTebd,
 )
 from ..backend import (
     PTTestCase,
@@ -37,7 +35,6 @@ from ..backend import (
         (DescriptorParamSeA, DescrptSeA),
         (DescriptorParamSeR, DescrptSeR),
         (DescriptorParamSeT, DescrptSeT),
-        (DescriptorParamSeTTebd, DescrptSeTTebd),
         (DescriptorParamDPA1, DescrptDPA1),
         (DescriptorParamDPA2, DescrptDPA2),
         (DescriptorParamHybrid, DescrptHybrid),

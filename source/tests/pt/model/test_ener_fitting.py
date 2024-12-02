@@ -65,7 +65,6 @@ class TestInvarFitting(unittest.TestCase, TestCaseSingleFrameWithNlist):
                 mixed_types=mixed_types,
                 exclude_types=et,
                 neuron=nn,
-                seed=GLOBAL_SEED,
             ).to(env.DEVICE)
             ft1 = DPInvarFitting.deserialize(ft0.serialize())
             ft2 = InvarFitting.deserialize(ft0.serialize())
@@ -169,7 +168,6 @@ class TestInvarFitting(unittest.TestCase, TestCaseSingleFrameWithNlist):
                 numb_aparam=nap,
                 mixed_types=mixed_types,
                 exclude_types=et,
-                seed=GLOBAL_SEED,
             ).to(env.DEVICE)
             torch.jit.script(ft0)
 
@@ -179,7 +177,6 @@ class TestInvarFitting(unittest.TestCase, TestCaseSingleFrameWithNlist):
             self.nt,
             3,
             1,
-            seed=GLOBAL_SEED,
         )
         rng = np.random.default_rng(GLOBAL_SEED)
         foo = rng.normal([3, 4])
